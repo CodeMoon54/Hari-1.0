@@ -10,7 +10,7 @@ load_dotenv()
 
 class HaríServidor:
     def __init__(self):
-        self.GEMINI_API_KEY = os.getenv("AIzaSyAWsMXWcJD2EeCvTbmeSW7KtBus5a0MAhE")
+        self.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
         if not self.GEMINI_API_KEY:
             raise ValueError("❌ GEMINI_API_KEY no encontrada")
         
