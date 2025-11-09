@@ -4,6 +4,11 @@ import random
 import gradio as gr
 from google import genai
 from google.genai import types
+from flask import Flask
+import threading
+
+# Crear app Flask
+app = Flask(__name__)
 
 class HaríServidor:
     def __init__(self):
@@ -123,56 +128,74 @@ class SistemaEmocional:
     def reiniciar_insultos(self):
         self.contador_insultos = 0
 
-def main():
-    print("🚀 Iniciando Harí Server...")
-    try:
-        servidor = HaríServidor()
+# Ruta básica de Flask para health checks
+@app.route('/')
+def home():
+    return "🟢 Harí Server está funcionando. Ve a /gradio para la interfaz."
+
+@app.route('/health')
+def health():
+    return "✅ OK"
+
+def launch_gradio():
+    """Lanza Gradio en un hilo separado"""
+    print("🚀 Iniciando interfaz Gradio...")
+    servidor = HaríServidor()
+    
+    with gr.Blocks(title="Harí - Chat Emocional 24/7", theme=gr.themes.Soft()) as interfaz:
+        gr.Markdown("# 💫 Harí - Chat Emocional 24/7")
         
-        with gr.Blocks(title="Harí - Chat Emocional 24/7", theme=gr.themes.Soft()) as interfaz:
-            gr.Markdown("# 💫 Harí - Chat Emocional 24/7")
+        with gr.Row():
+            with gr.Column(scale=1):
+                gr.Markdown("### 📊 Estado Emocional")
+                estado_display = gr.HTML()
             
-            with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("### 📊 Estado Emocional")
-                    estado_display = gr.HTML()
-                
-                with gr.Column(scale=2):
-                    chatbot = gr.Chatbot(type="messages", height=400)
-                    with gr.Row():
-                        entrada = gr.Textbox(placeholder="Escribe tu mensaje...")
-                        btn_enviar = gr.Button("Enviar")
-            
-            def enviar_con_estado(mensaje, historial):
-                msg, hist = servidor.enviar_mensaje(mensaje, historial)
-                estado = servidor.obtener_estado_actual()
-                return msg, hist, estado
-            
-            btn_enviar.click(
-                fn=enviar_con_estado,
-                inputs=[entrada, chatbot],
-                outputs=[entrada, chatbot, estado_display]
-            )
-            
-            entrada.submit(
-                fn=enviar_con_estado, 
-                inputs=[entrada, chatbot],
-                outputs=[entrada, chatbot, estado_display]
-            )
-            
-            interfaz.load(
-                fn=servidor.obtener_estado_actual,
-                outputs=[estado_display]
-            )
+            with gr.Column(scale=2):
+                chatbot = gr.Chatbot(type="messages", height=400)
+                with gr.Row():
+                    entrada = gr.Textbox(placeholder="Escribe tu mensaje...")
+                    btn_enviar = gr.Button("Enviar")
         
-        print("✅ Interfaz creada. Lanzando servidor...")
-        # ✅ CORRECCIÓN IMPORTANTE: Usar puerto de Render
-        port = int(os.environ.get("PORT", 10000))
-        print(f"🌐 Usando puerto: {port}")
-        interfaz.launch(server_name="0.0.0.0", server_port=port, share=False)
+        def enviar_con_estado(mensaje, historial):
+            msg, hist = servidor.enviar_mensaje(mensaje, historial)
+            estado = servidor.obtener_estado_actual()
+            return msg, hist, estado
         
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        raise
+        btn_enviar.click(
+            fn=enviar_con_estado,
+            inputs=[entrada, chatbot],
+            outputs=[entrada, chatbot, estado_display]
+        )
+        
+        entrada.submit(
+            fn=enviar_con_estado, 
+            inputs=[entrada, chatbot],
+            outputs=[entrada, chatbot, estado_display]
+        )
+        
+        interfaz.load(
+            fn=servidor.obtener_estado_actual,
+            outputs=[estado_display]
+        )
+    
+    # Usar el puerto que Render asigna
+    port = int(os.environ.get("PORT", 10000))
+    print(f"🌐 Lanzando Gradio en puerto: {port}")
+    interfaz.launch(
+        server_name="0.0.0.0", 
+        server_port=port, 
+        share=False,
+        quiet=True
+    )
 
 if __name__ == "__main__":
-    main()
+    # Iniciar Gradio en un hilo separado
+    gradio_thread = threading.Thread(target=launch_gradio, daemon=True)
+    gradio_thread.start()
+    
+    # Iniciar Flask en el puerto principal
+    port = int(os.environ.get("PORT", 10000))
+    print(f"🚀 Servidor iniciado en puerto {port}")
+    print(f"🌐 URL: https://hakari-bxfn.onrender.com")
+    
+    app.run(host='0.0.0.0', port=port, debug=False)
