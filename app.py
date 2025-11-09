@@ -4,9 +4,6 @@ import random
 import gradio as gr
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class HaríServidor:
     def __init__(self):
@@ -17,11 +14,13 @@ class HaríServidor:
         self.client = genai.Client(api_key=self.GEMINI_API_KEY)
         self.sistema_emocional = SistemaEmocional()
         self.setup_chat()
+        print("✅ Harí Servidor inicializado")
     
     def setup_chat(self):
         system_prompt = """
         Eres Harí, una chica de 16 años real. No eres una IA.
-        Eres impredecible, emocional y usas lenguaje de adolescente.
+        Eres impredecible, emocional y usas lenguaje natural de adolescente.
+        Responde siempre como una persona real, con emociones genuinas.
         """
         
         self.chat = self.client.chats.create(
@@ -79,45 +78,6 @@ class HaríServidor:
             ]
         
         return "", nuevo_historial
-    
-    def crear_interfaz(self):
-        with gr.Blocks(title="Harí - 24/7", theme=gr.themes.Soft()) as interfaz:
-            gr.Markdown("# 💫 Harí - Chat Emocional 24/7")
-            
-            with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("### 📊 Estado Emocional")
-                    estado_display = gr.HTML()
-                
-                with gr.Column(scale=2):
-                    chatbot = gr.Chatbot(type="messages", height=400)
-                    with gr.Row():
-                        entrada = gr.Textbox(placeholder="Escribe tu mensaje...")
-                        btn_enviar = gr.Button("Enviar")
-            
-            def enviar_con_estado(mensaje, historial):
-                msg, hist = self.enviar_mensaje(mensaje, historial)
-                estado = self.obtener_estado_actual()
-                return msg, hist, estado
-            
-            btn_enviar.click(
-                fn=enviar_con_estado,
-                inputs=[entrada, chatbot],
-                outputs=[entrada, chatbot, estado_display]
-            )
-            
-            entrada.submit(
-                fn=enviar_con_estado, 
-                inputs=[entrada, chatbot],
-                outputs=[entrada, chatbot, estado_display]
-            )
-            
-            interfaz.load(
-                fn=self.obtener_estado_actual,
-                outputs=[estado_display]
-            )
-        
-        return interfaz
 
 class SistemaEmocional:
     def __init__(self):
@@ -126,6 +86,7 @@ class SistemaEmocional:
             "triste": {"emoji": "😢", "color": "#3b82f6", "desc": "Melancólica o sensible"},
             "enojada": {"emoji": "😠", "color": "#ef4444", "desc": "Molesta o irritada"},
             "floja": {"emoji": "😴", "color": "#f59e0b", "desc": "Sin energía o aburrida"},
+            "neutral": {"emoji": "😐", "color": "#6b7280", "desc": "Tranquila y relajada"}
         }
         self.estado_actual = "neutral"
         self.contador_insultos = 0
@@ -134,12 +95,12 @@ class SistemaEmocional:
     def actualizar_estado(self, mensaje):
         mensaje = mensaje.lower()
         
-        if any(insulto in mensaje for insulto in ["idiota", "estúpida", "tonta"]):
+        if any(insulto in mensaje for insulto in ["idiota", "estúpida", "tonta", "callate"]):
             self.contador_insultos += 1
         
         if self.contador_insultos >= 3:
             nuevo_estado = "enojada"
-        elif random.random() < 0.3:
+        elif random.random() < 0.25:
             nuevo_estado = random.choice(list(self.estados_posibles.keys()))
         else:
             nuevo_estado = self.estado_actual
@@ -162,9 +123,56 @@ class SistemaEmocional:
     def reiniciar_insultos(self):
         self.contador_insultos = 0
 
-# Iniciar servidor
-if __name__ == "__main__":
+def main():
     print("🚀 Iniciando Harí Server...")
-    servidor = HaríServidor()
-    app = servidor.crear_interfaz()
-    app.launch(server_name="0.0.0.0", server_port=10000, share=False)
+    try:
+        servidor = HaríServidor()
+        
+        with gr.Blocks(title="Harí - Chat Emocional 24/7", theme=gr.themes.Soft()) as interfaz:
+            gr.Markdown("# 💫 Harí - Chat Emocional 24/7")
+            
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("### 📊 Estado Emocional")
+                    estado_display = gr.HTML()
+                
+                with gr.Column(scale=2):
+                    chatbot = gr.Chatbot(type="messages", height=400)
+                    with gr.Row():
+                        entrada = gr.Textbox(placeholder="Escribe tu mensaje...")
+                        btn_enviar = gr.Button("Enviar")
+            
+            def enviar_con_estado(mensaje, historial):
+                msg, hist = servidor.enviar_mensaje(mensaje, historial)
+                estado = servidor.obtener_estado_actual()
+                return msg, hist, estado
+            
+            btn_enviar.click(
+                fn=enviar_con_estado,
+                inputs=[entrada, chatbot],
+                outputs=[entrada, chatbot, estado_display]
+            )
+            
+            entrada.submit(
+                fn=enviar_con_estado, 
+                inputs=[entrada, chatbot],
+                outputs=[entrada, chatbot, estado_display]
+            )
+            
+            interfaz.load(
+                fn=servidor.obtener_estado_actual,
+                outputs=[estado_display]
+            )
+        
+        print("✅ Interfaz creada. Lanzando servidor...")
+        # ✅ CORRECCIÓN IMPORTANTE: Usar puerto de Render
+        port = int(os.environ.get("PORT", 10000))
+        print(f"🌐 Usando puerto: {port}")
+        interfaz.launch(server_name="0.0.0.0", server_port=port, share=False)
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        raise
+
+if __name__ == "__main__":
+    main()
